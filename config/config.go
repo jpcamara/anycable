@@ -49,6 +49,7 @@ type Config struct {
 	RedisBroadcast       broadcast.RedisConfig       `toml:"redis_stream_broadcast"`
 	NATSBroadcast        broadcast.LegacyNATSConfig  `toml:"nats_broadcast"`
 	HTTPBroadcast        broadcast.HTTPConfig        `toml:"http_broadcast"`
+	PostgresBroadcast    broadcast.PostgresConfig    `toml:"postgres_broadcast"`
 	RedisPubSub          pubsub.RedisConfig          `toml:"redis_pubsub"`
 	NATSPubSub           pubsub.NATSConfig           `toml:"nats_pubsub"`
 	NATS                 nconfig.NATSConfig          `toml:"nats"`
@@ -84,6 +85,7 @@ func NewConfig() Config {
 		LegacyRedisBroadcast: broadcast.NewLegacyRedisConfig(),
 		NATSBroadcast:        broadcast.NewLegacyNATSConfig(),
 		HTTPBroadcast:        broadcast.NewHTTPConfig(),
+		PostgresBroadcast:    broadcast.NewPostgresConfig(),
 		RedisPubSub:          pubsub.NewRedisConfig(),
 		NATSPubSub:           pubsub.NewNATSConfig(),
 		NATS:                 nconfig.NewNATSConfig(),
@@ -223,6 +225,8 @@ func (c *Config) ToToml() string {
 	result.WriteString(c.LegacyRedisBroadcast.ToToml())
 	result.WriteString("[nats_broadcast]\n")
 	result.WriteString(c.NATSBroadcast.ToToml())
+	result.WriteString("[postgres_broadcast]\n")
+	result.WriteString(c.PostgresBroadcast.ToToml())
 
 	result.WriteString("# Pub/sub adapters configuration\n[redis_pubsub]\n")
 	result.WriteString(c.RedisPubSub.ToToml())

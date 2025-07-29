@@ -185,8 +185,12 @@ test-conformance-nats: tmp/anycable-go-test
 test-conformance-nats-embedded: tmp/anycable-go-test
 	ANYCABLE_BROADCAST_ADAPTER=nats ANYCABLE_NATS_SERVERS=nats://127.0.0.1:4242 ANYCABLE_EMBED_NATS=true ANYCABLE_ENATS_ADDR=nats://127.0.0.1:4242 bundle exec anyt -c "tmp/anycable-go-test --headers=cookie,x-api-token" --target-url="ws://localhost:8080/cable" --require=etc/anyt/broadcast_tests/*.rb
 
+test-conformance-postgres: tmp/anycable-go-test
+	ANYCABLE_BROADCAST_ADAPTER=postgres ANYCABLE_POSTGRES_URL="$(POSTGRES_URL)" bundle exec anyt -c "tmp/anycable-go-test --headers=cookie,x-api-token" --target-url="ws://localhost:8080/cable" --require=etc/anyt/broadcast_tests/postgres_test.rb
+
 test-conformance-broker-http: tmp/anycable-go-test
 	ANYCABLE_PRESENCE_TTL=2 ANYCABLE_BROKER=memory ANYCABLE_BROADCAST_ADAPTER=http bundle exec anyt -c "tmp/anycable-go-test --headers=cookie,x-api-token" --target-url="ws://localhost:8080/cable" --require=etc/anyt/**/*.rb
+
 
 test-conformance-broker-redis: tmp/anycable-go-test
 	ANYCABLE_PRESENCE_TTL=2 ANYCABLE_BROKER=memory ANYCABLE_BROADCAST_ADAPTER=redisx ANYCABLE_HTTP_BROADCAST_SECRET=any_secret bundle exec anyt -c "tmp/anycable-go-test --headers=cookie,x-api-token" --target-url="ws://localhost:8080/cable" --require=etc/anyt/**/*.rb
@@ -203,7 +207,7 @@ test-conformance-embedded: tmp/anycable-embedded-test
 	ANYCABLE_HEADERS=cookie,x-api-token \
 	bundle exec anyt -c "tmp/anycable-embedded-test" --target-url="ws://localhost:8080/cable" --require=etc/anyt/broadcast_tests/*.rb
 
-test-conformance-all: test-conformance test-conformance-ssl test-conformance-http test-conformance-embedded
+test-conformance-all: test-conformance test-conformance-ssl test-conformance-http test-conformance-postgres test-conformance-embedded
 
 TESTFILE ?= features/*.testfile
 test-features: build

@@ -84,6 +84,12 @@ func WithDefaultBroadcaster() Option {
 			case "nats":
 				nb := broadcast.NewLegacyNATSBroadcaster(h, &c.NATSBroadcast, l)
 				broadcasters = append(broadcasters, nb)
+			case "postgres":
+				pb, err := broadcast.NewPostgresSubscriber(h.(*node.Node), &c.PostgresBroadcast, nil, l)
+				if err != nil {
+					return nil, err
+				}
+				broadcasters = append(broadcasters, pb)
 			default:
 				return broadcasters, errorx.IllegalArgument.New("Unsupported broadcast adapter: %s", adapter)
 			}

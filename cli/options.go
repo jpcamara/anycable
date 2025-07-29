@@ -105,6 +105,7 @@ func NewConfigFromCLI(args []string, opts ...cliOption) (*config.Config, error, 
 	flags = append(flags, brokerCLIFlags(&c)...)
 	flags = append(flags, redisCLIFlags(&c)...)
 	flags = append(flags, redisBroadcastCLIFlags(&c)...)
+	flags = append(flags, postgresBroadcastCLIFlags(&c)...)
 	flags = append(flags, httpBroadcastCLIFlags(&c)...)
 	flags = append(flags, natsCLIFlags(&c)...)
 	flags = append(flags, rpcCLIFlags(&c, &headers, &cookieFilter, &noRPC)...)
@@ -457,6 +458,7 @@ const (
 	broadcastCategoryDescription     = "BROADCASTING:"
 	redisCategoryDescription         = "REDIS:"
 	redisXCategoryDescription        = "REDIS X BROADCAST:"
+	postgresCategoryDescription      = "POSTGRES BROADCAST:"
 	httpBroadcastCategoryDescription = "HTTP BROADCAST:"
 	natsCategoryDescription          = "NATS:"
 	rpcCategoryDescription           = "RPC:"
@@ -748,6 +750,25 @@ func redisBroadcastCLIFlags(c *config.Config) []cli.Flag {
 			Value:       c.RedisBroadcast.StreamReadBlockMilliseconds,
 			Destination: &c.RedisBroadcast.StreamReadBlockMilliseconds,
 			Hidden:      true,
+		},
+	})
+}
+
+// postgresBroadcastCLIFlags returns Postgres broadcast flags
+func postgresBroadcastCLIFlags(c *config.Config) []cli.Flag {
+	return withDefaults(postgresCategoryDescription, []cli.Flag{
+		&cli.StringFlag{
+			Name:        "postgres_url",
+			Usage:       "Postgres connection URL",
+			Value:       c.PostgresBroadcast.URL,
+			Destination: &c.PostgresBroadcast.URL,
+		},
+
+		&cli.StringFlag{
+			Name:        "postgres_channel",
+			Usage:       "Postgres channel for broadcasts",
+			Value:       c.PostgresBroadcast.Channel,
+			Destination: &c.PostgresBroadcast.Channel,
 		},
 	})
 }
