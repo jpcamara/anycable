@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"log/slog"
@@ -60,6 +61,10 @@ type PostgresSubscriber struct {
 	pool   *pgxpool.Pool
 	cancel context.CancelFunc
 	done   chan error
+	
+	// Connection management following River's pattern
+	mu   sync.Mutex
+	conn *pgx.Conn
 }
 
 var _ Broadcaster = (*PostgresSubscriber)(nil)
@@ -109,6 +114,15 @@ func (s *PostgresSubscriber) Shutdown(ctx context.Context) error {
 	if s.cancel != nil {
 		s.cancel()
 	}
+
+	// Clean up hijacked connection following River's pattern
+	s.mu.Lock()
+	if s.conn != nil {
+		// Connection will be cleaned up by the defer in listenOnce
+		// We just nil it here to prevent double cleanup
+		s.conn = nil
+	}
+	s.mu.Unlock()
 
 	if s.pool != nil {
 		s.pool.Close()
@@ -199,13 +213,33 @@ func (s *PostgresSubscriber) listen(ctx context.Context, done chan error) {
 	}
 }
 
-// listenOnce performs a single listen cycle
+// listenOnce performs a single listen cycle following River's connection pattern
 func (s *PostgresSubscriber) listenOnce(ctx context.Context) error {
-	conn, err := s.pool.Acquire(ctx)
+	// Acquire connection from pool and take exclusive ownership
+	poolConn, err := s.pool.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to acquire connection: %w", err)
 	}
-	defer conn.Release()
+
+	// Assume full ownership of the conn so that it doesn't get released back to
+	// the pool or auto-closed by the pool (following River's pattern)
+	conn := poolConn.Hijack()
+
+	// Store connection for shutdown access
+	s.mu.Lock()
+	s.conn = conn
+	s.mu.Unlock()
+
+	// Ensure connection is cleaned up
+	defer func() {
+		s.mu.Lock()
+		if s.conn == conn {
+			// Only close if this is still the active connection
+			conn.Close(context.Background())
+			s.conn = nil
+		}
+		s.mu.Unlock()
+	}()
 
 	// Start listening on the channel
 	if _, err := conn.Exec(ctx, fmt.Sprintf("LISTEN %s", pgx.Identifier{s.config.Channel}.Sanitize())); err != nil {
@@ -219,7 +253,7 @@ func (s *PostgresSubscriber) listenOnce(ctx context.Context) error {
 
 	// Listen for notifications
 	for {
-		notification, err := conn.Conn().WaitForNotification(ctx)
+		notification, err := conn.WaitForNotification(ctx)
 		if err != nil {
 			return fmt.Errorf("error waiting for notification: %w", err)
 		}
