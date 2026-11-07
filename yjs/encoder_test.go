@@ -189,3 +189,23 @@ func TestVarUintRoundTrip(t *testing.T) {
 		assert.Equal(t, len(appendVarUint(nil, n)), size)
 	}
 }
+
+func TestAwarenessGoesToTheChannelWithoutWhisper(t *testing.T) {
+	enc := authed(t)
+	enc.Whisper = false
+	frame := []byte{MessageAwareness, 4, 1, 2, 3, 4}
+
+	msg, err := enc.Decode(frame)
+
+	require.NoError(t, err)
+	assert.Equal(t, "message", msg.Command)
+	assert.JSONEq(t, `{"update":"`+b64(frame)+`"}`, msg.Data.(string))
+}
+
+func TestOtherMessagesBecomeTextFrames(t *testing.T) {
+	frame, err := NewEncoder().Encode(&common.Reply{Identifier: identifier, Message: map[string]interface{}{"notice": "full"}})
+
+	require.NoError(t, err)
+	assert.Equal(t, ws.TextFrame, frame.FrameType)
+	assert.JSONEq(t, `{"notice":"full"}`, string(frame.Payload))
+}

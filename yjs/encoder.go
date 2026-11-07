@@ -18,6 +18,10 @@
 //	{"update": b64}          -> raw frame
 //	{"awareness": b64}       -> raw frame
 //	{"ack": id}              -> [101][varUint id]
+//	anything else            -> JSON text frame
+//
+// Awareness is whispered unless the endpoint is told otherwise, in which case
+// it goes to the channel as {"update": b64} and the channel relays it.
 //
 // A rejected subscription or connection gets a y-protocols permission-denied
 // message, [2][0][varString reason], and the socket closes with 4403.
@@ -67,6 +71,11 @@ var keepalive = []byte{MessageAwareness, 1, 0}
 
 // Encoder is per session: it remembers the identifier from the auth frame.
 type Encoder struct {
+	// Whisper sends awareness frames straight to the other clients. When
+	// false, they go to the channel like document frames, so the server can
+	// validate and throttle them.
+	Whisper bool
+
 	mu         sync.Mutex
 	identifier string
 }
@@ -74,7 +83,7 @@ type Encoder struct {
 var _ encoders.Encoder = (*Encoder)(nil)
 
 func NewEncoder() *Encoder {
-	return &Encoder{}
+	return &Encoder{Whisper: true}
 }
 
 func (*Encoder) ID() string {
@@ -109,6 +118,9 @@ func (e *Encoder) Decode(raw []byte) (*common.Message, error) {
 		}
 		return receive(identifier, raw[1+n:], &id), nil
 	case MessageAwareness:
+		if !e.Whisper {
+			return receive(identifier, raw, nil), nil
+		}
 		return &common.Message{
 			Command:    "whisper",
 			Identifier: identifier,
@@ -198,7 +210,7 @@ func (e *Encoder) EncodeTransmission(raw string) (*ws.SentFrame, error) {
 func encodeMessage(message interface{}) (*ws.SentFrame, error) {
 	m, ok := message.(map[string]interface{})
 	if !ok {
-		return nil, nil
+		return text(message)
 	}
 
 	if id, ok := m["ack"].(float64); ok {
@@ -215,7 +227,18 @@ func encodeMessage(message interface{}) (*ws.SentFrame, error) {
 		}
 	}
 
-	return nil, nil
+	return text(message)
+}
+
+// text sends an application message that has no y-protocols form, such as a
+// channel's own notice, as a JSON text frame. y-websocket expects only binary
+// frames, so only clients that read text frames should rely on these.
+func text(message interface{}) (*ws.SentFrame, error) {
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+	return &ws.SentFrame{FrameType: ws.TextFrame, Payload: payload}, nil
 }
 
 func binary(payload []byte) *ws.SentFrame {
