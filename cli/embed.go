@@ -28,6 +28,22 @@ func (e *Embedded) WebSocketHandler() (http.Handler, error) {
 	return wsHandler, nil
 }
 
+// WebSocketEndpoints returns the handlers registered with WithWebSocketEndpoint,
+// keyed by path, so an embedding server can route them alongside /cable.
+func (e *Embedded) WebSocketEndpoints() (map[string]http.Handler, error) {
+	handlers := make(map[string]http.Handler, len(e.r.websocketEndpoints))
+
+	for path, factory := range e.r.websocketEndpoints {
+		handler, err := factory(e.n, e.r.config, e.r.log)
+		if err != nil {
+			return nil, err
+		}
+		handlers[path] = handler
+	}
+
+	return handlers, nil
+}
+
 // SSEHandler returns an HTTP handler to serve SSE connections via AnyCable.
 // Please, provide your HTTP server's shutdown context to terminate SSE connections gracefully
 // on server shutdown.

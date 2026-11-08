@@ -36,6 +36,10 @@ func (m *EncodingCache) Fetch(
 	}
 
 	if b := m.encodedBytes[encoder]; b == nil {
+		// An encoder may skip a message it has no frame for.
+		if m.encoderErrors[encoder] == nil {
+			return nil, nil
+		}
 		return nil, errorx.Decorate(m.encoderErrors[encoder], "encoding failed")
 	} else {
 		return b, nil
